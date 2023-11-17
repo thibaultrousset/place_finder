@@ -20,17 +20,49 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _getCurrentPosition();
   }
 
-  late Position position;
+   Position? position;
+
+  Future<void> _getCurrentPosition() async {
+    bool serviceEnabled;
+LocationPermission permission;
+
+serviceEnabled = await Geolocator.isLocationServiceEnabled();
+if (!serviceEnabled) {
+  return Future.error('Location services are disabled');
+}
+
+permission = await Geolocator.checkPermission();
+if (permission == LocationPermission.denied) {
+  permission = await Geolocator.requestPermission();
+  if (permission == LocationPermission.denied) {
+    return Future.error('Location permissions are denied');
+  }
+}
+
+if (permission == LocationPermission.deniedForever) {
+  return Future.error(
+      'Location permissions are permanently denied, we cannot request permissions.');
+}
+
+if(permission == LocationPermission.always || permission == LocationPermission.whileInUse){
+ position  = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+}
+
+
+  }
 
   Future<void> _onMapCreated(GoogleMapController controller) async {
     _controller.complete(controller);
-    position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    print(position);
-    controller.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-        target: LatLng(position.latitude, position.longitude), zoom: 14)));
+    if (position != null ){
+  controller.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+        target: LatLng(position!.latitude, position!.longitude), zoom: 14)));
+    }
+
+  
   }
 
   Set<Marker> _markers(List<PlaceViewModel> places) {
@@ -50,10 +82,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final vm = Provider.of<PlaceListViewModel>(context);
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
       body: Center(
         child: Stack(
           children: <Widget>[
@@ -61,13 +89,33 @@ class _HomePageState extends State<HomePage> {
                 onMapCreated: _onMapCreated,
                 markers: _markers(vm.placeListViewModel),
                 initialCameraPosition: const CameraPosition(
-                    target: LatLng(45.541563, -122.677433), zoom: 14)),
-            TextField(
-              onSubmitted: (value) {
-                vm.populateSearch(value, position.latitude, position.longitude);
-              },
-              decoration: const InputDecoration(
-                  fillColor: Colors.white, filled: true, labelText: "Search"),
+                    target: LatLng(43.53202309513262, 5.44870502622721), zoom: 14)),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(5.0),
+                child: TextField(
+                  onSubmitted: (value) {
+                    vm.populateSearch(
+                        value, position!.latitude, position!.longitude);
+                  },
+                  decoration: const InputDecoration(
+                      fillColor: Colors.white,
+                      filled: true,
+                      labelText: "Search"),
+                ),
+              ),
+            ),
+            Visibility(
+              visible: vm.placeListViewModel.isNotEmpty,
+              child: Positioned(
+                bottom: 5,
+                left: 5,
+                child: MaterialButton(
+                  onPressed: () {},
+                  color: Colors.grey.withOpacity(0.5),
+                  child: const Text("Show List"),
+                ),
+              ),
             )
           ],
         ),
